@@ -175,6 +175,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          claude_api_key: string | null
+          created_at: string
+          gemini_api_key: string | null
+          id: string
+          llm_model: string
+          llm_provider: string
+          openai_api_key: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          claude_api_key?: string | null
+          created_at?: string
+          gemini_api_key?: string | null
+          id?: string
+          llm_model?: string
+          llm_provider?: string
+          openai_api_key?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          claude_api_key?: string | null
+          created_at?: string
+          gemini_api_key?: string | null
+          id?: string
+          llm_model?: string
+          llm_provider?: string
+          openai_api_key?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

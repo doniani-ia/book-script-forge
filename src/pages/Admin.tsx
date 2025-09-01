@@ -175,7 +175,7 @@ export default function Admin() {
               Adicionar Novo Livro
             </CardTitle>
             <CardDescription>
-              Faça upload de livros em PDF, EPUB ou TXT
+              Faça upload de livros em PDF, DOC, EPUB ou TXT
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -206,12 +206,12 @@ export default function Admin() {
                 <Input
                   id="file"
                   type="file"
-                  accept=".pdf,.epub,.txt"
+                  accept=".pdf,.doc,.docx,.epub,.txt"
                   onChange={(e) => setFormData({...formData, file: e.target.files?.[0] || null})}
                   required
                 />
                 <p className="text-xs text-muted-foreground">
-                  Formatos aceitos: PDF, EPUB, TXT (máx. 50MB)
+                  Formatos aceitos: PDF, DOC, DOCX, EPUB, TXT (máx. 50MB)
                 </p>
               </div>
 

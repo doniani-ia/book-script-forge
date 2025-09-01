@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FileText, BookOpen, LogOut, User } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { LLMSettings } from '@/components/settings/LLMSettings';
 
 export const Navbar = () => {
   const { profile, signOut } = useAuth();
@@ -60,6 +61,7 @@ export const Navbar = () => {
                 {profile?.role}
               </Badge>
             </div>
+            <LLMSettings />
             <Button onClick={signOut} variant="outline" size="sm">
               <LogOut className="h-4 w-4 mr-2" />
               Sair
