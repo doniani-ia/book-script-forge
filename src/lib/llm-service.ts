@@ -57,6 +57,7 @@ export class LLMService {
     duration: number,
     languageStyle: string,
     environment: string,
+    environmentDescription?: string,
     relevantContent?: string[]
   ): Promise<LLMResponse> {
     if (!this.settings) {
@@ -74,7 +75,7 @@ export class LLMService {
       }
     }
 
-    const prompt = this.buildScriptPrompt(theme, duration, languageStyle, environment, ragContent);
+    const prompt = this.buildScriptPrompt(theme, duration, languageStyle, environment, environmentDescription, ragContent);
 
     switch (this.settings.llm_provider) {
       case 'openai':
@@ -115,10 +116,15 @@ export class LLMService {
     duration: number,
     languageStyle: string,
     environment: string,
+    environmentDescription?: string,
     relevantContent?: string[]
   ): string {
     const contentContext = relevantContent && relevantContent.length > 0 
       ? `\n\nCONTEÚDO RELEVANTE DOS LIVROS:\n${relevantContent.join('\n\n')}`
+      : '';
+
+    const environmentContext = environmentDescription 
+      ? `\n\nDESCRIÇÃO DETALHADA DO AMBIENTE:\n${environmentDescription}`
       : '';
 
     return `Você é um especialista em criação de roteiros para YouTube. Crie um roteiro envolvente e bem estruturado baseado nas informações fornecidas.
@@ -126,15 +132,16 @@ export class LLMService {
 TEMA: ${theme}
 DURAÇÃO: ${duration} minutos
 ESTILO DE LINGUAGEM: ${languageStyle}
-AMBIENTE: ${environment}${contentContext}
+AMBIENTE: ${environment}${environmentContext}${contentContext}
 
 INSTRUÇÕES:
 1. Crie um roteiro estruturado com introdução, desenvolvimento e conclusão
 2. Use o estilo de linguagem ${languageStyle}
-3. Mantenha o ambiente ${environment} ao longo do vídeo
-4. Inclua elementos de engajamento (perguntas, call-to-actions)
-5. Estruture o conteúdo para ${duration} minutos de duração
-6. Use as informações dos livros quando relevante para enriquecer o conteúdo
+3. Mantenha o ambiente ${environment} ao longo do vídeo${environmentDescription ? '\n4. Incorpore os detalhes específicos da descrição do ambiente fornecida' : ''}
+${environmentDescription ? '5' : '4'}. Inclua elementos de engajamento (perguntas, call-to-actions)
+${environmentDescription ? '6' : '5'}. Estruture o conteúdo para ${duration} minutos de duração
+${environmentDescription ? '7' : '6'}. Use sempre as informações dos livros para enriquecer o conteúdo
+${environmentDescription ? '8' : '7'}. O Roteiro precisa estar sem descrições de capítulos, apenas o conteúdo do vídeo
 
 FORMATO DE RESPOSTA (JSON):
 {
@@ -143,7 +150,7 @@ FORMATO DE RESPOSTA (JSON):
   "seo_title": "Título otimizado para SEO",
   "seo_description": "Descrição otimizada para SEO (máx 160 caracteres)",
   "seo_tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "thumbnail_prompt": "Prompt detalhado para gerar thumbnail"
+  "thumbnail_prompt": "Prompt detalhado para gerar thumbnail do vídeo"
 }
 
 Responda APENAS com o JSON válido, sem texto adicional.`;

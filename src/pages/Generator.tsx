@@ -6,11 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Wand2, Clock, Globe, Mic, Volume2, Eye } from 'lucide-react';
+import { Wand2, Clock, Globe, Mic, Volume2, Eye, MapPin } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { llmService } from '@/lib/llm-service';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { TranslationService } from '@/lib/translation-service';
 
 export default function Generator() {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ export default function Generator() {
     duration: '',
     languageStyle: '',
     environment: '',
+    environmentDescription: '',
     targetLanguage: 'pt-BR'
   });
   
@@ -72,7 +74,8 @@ export default function Generator() {
         formData.theme,
         parseInt(formData.duration),
         formData.languageStyle,
-        formData.environment
+        formData.environment,
+        formData.environmentDescription
       );
 
       // Parse the JSON response
@@ -247,26 +250,7 @@ export default function Generator() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Globe className="h-4 w-4" />
-                    Idioma Final
-                  </Label>
-                  <Select
-                    value={formData.targetLanguage}
-                    onValueChange={(value) => setFormData({...formData, targetLanguage: value})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="es">Español</SelectItem>
-                      <SelectItem value="fr">Français</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -310,6 +294,48 @@ export default function Generator() {
                       <SelectItem value="suspense">Suspense</SelectItem>
                       <SelectItem value="motivacional">Motivacional</SelectItem>
                       <SelectItem value="educativo">Educativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Descrição do Ambiente
+                  </Label>
+                  <Textarea
+                    placeholder="Descreva livremente o ambiente, cenário, atmosfera ou contexto específico que deseja para o vídeo..."
+                    value={formData.environmentDescription}
+                    onChange={(e) => setFormData({...formData, environmentDescription: e.target.value})}
+                    className="min-h-[80px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Ex: "Ambiente noturno com iluminação suave, cenário de biblioteca, atmosfera intimista..."
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    Idioma Final
+                  </Label>
+                  <Select
+                    value={formData.targetLanguage}
+                    onValueChange={(value) => setFormData({...formData, targetLanguage: value})}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o idioma final" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TranslationService.getSupportedLanguages().map((lang) => (
+                        <SelectItem key={lang.code} value={lang.code}>
+                          <div className="flex items-center gap-2">
+                            <span>{lang.flag}</span>
+                            <span>{lang.nativeName}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
