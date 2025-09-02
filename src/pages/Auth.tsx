@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,8 +9,24 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { toast } from '@/hooks/use-toast';
 
 export default function Auth() {
-  const { user, signIn, signUp, loading } = useAuth();
+  const { user, profile, signIn, signUp, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  // Redirect user after successful login based on their role
+  useEffect(() => {
+    if (user && profile && !loading) {
+      // Ensure role is a string and trim whitespace
+      const userRole = String(profile.role).trim().toLowerCase();
+      
+      // Force redirect based on role
+      if (userRole === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/generator');
+      }
+    }
+  }, [user, profile, loading, navigate]);
 
   // Redirect if already authenticated
   if (user && !loading) {

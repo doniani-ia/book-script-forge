@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, BookOpen, Trash2, FileText, Loader2 } from 'lucide-react';
+import { Upload, BookOpen, Trash2, FileText, Loader2, Play, RefreshCw, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { bookProcessingService } from '@/lib/book-processing-service';
+import { generateUniqueFilename, isAllowedFileType, getFileExtension } from '@/lib/file-utils';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 interface Book {
   id: string;
@@ -20,6 +24,7 @@ interface Book {
 }
 
 export default function Admin() {
+  const { user, profile, loading: authLoading } = useAuth();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -29,6 +34,28 @@ export default function Admin() {
     file: null as File | null
   });
   const { toast } = useToast();
+
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Verificando permissões...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Redirect to generator if not admin
+  if (profile?.role !== 'admin') {
+    return <Navigate to="/generator" replace />;
+  }
 
   const fetchBooks = async () => {
     setLoading(true);
@@ -57,21 +84,38 @@ export default function Admin() {
     e.preventDefault();
     if (!formData.file || !formData.title) return;
 
+    // Validate file type
+    if (!isAllowedFileType(formData.file.name)) {
+      toast({
+        title: "Tipo de arquivo não suportado",
+        description: "Apenas PDF, TXT, DOC, DOCX e EPUB são permitidos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUploading(true);
 
     try {
-      // First, upload file to storage
-      const fileExt = formData.file.name.split('.').pop();
-      const fileName = `${Date.now()}-${formData.file.name}`;
+      // Generate unique filename
+      const fileName = generateUniqueFilename(formData.file.name);
       const filePath = `books/${fileName}`;
+      const fileExt = getFileExtension(formData.file.name);
 
+      console.log('Uploading file to storage:', filePath);
       const { error: uploadError } = await supabase.storage
         .from('books')
         .upload(filePath, formData.file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+      
+      console.log('File uploaded successfully to storage');
 
       // Then create book record
+      console.log('Creating book record in database');
       const { error: insertError } = await supabase
         .from('books')
         .insert({
@@ -79,16 +123,43 @@ export default function Admin() {
           author: formData.author || null,
           file_path: filePath,
           file_size: formData.file.size,
-          file_type: fileExt || 'unknown',
+          file_type: fileExt,
           status: 'uploading',
           uploaded_by: (await supabase.auth.getUser()).data.user?.id || ''
         });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Database insert error:', insertError);
+        throw insertError;
+      }
+      
+      console.log('Book record created successfully');
+
+      // Get the inserted book ID for processing
+      console.log('Getting book ID for processing');
+      const { data: insertedBook } = await supabase
+        .from('books')
+        .select('id')
+        .eq('file_path', filePath)
+        .single();
+
+      if (insertedBook) {
+        console.log('Starting automatic processing for book:', insertedBook.id);
+        // Start processing automatically
+        try {
+          await bookProcessingService.processBook(insertedBook.id);
+          console.log('Book processing completed successfully');
+        } catch (processError) {
+          console.error('Error processing book:', processError);
+          // Don't throw here, just log the error
+        }
+      } else {
+        console.error('Could not find inserted book for processing');
+      }
 
       toast({
         title: "Livro enviado com sucesso",
-        description: "O processamento será iniciado automaticamente.",
+        description: "O processamento foi iniciado automaticamente.",
       });
 
       setFormData({ title: '', author: '', file: null });
@@ -106,26 +177,67 @@ export default function Admin() {
   };
 
   const handleDeleteBook = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este livro?')) return;
+    if (!confirm('Tem certeza que deseja excluir este livro? Esta ação não pode ser desfeita.')) return;
 
-    const { error } = await supabase
-      .from('books')
-      .delete()
-      .eq('id', id);
+    try {
+      const result = await bookProcessingService.deleteBook(id);
 
-    if (error) {
+      if (result.success) {
+        toast({
+          title: "Livro excluído completamente",
+          description: "Livro, chunks e arquivo foram removidos com sucesso.",
+        });
+      } else {
+        toast({
+          title: "Erro ao excluir",
+          description: result.error || "Ocorreu um erro ao excluir o livro.",
+          variant: "destructive",
+        });
+      }
+
+      // Refresh the books list
+      fetchBooks();
+
+    } catch (error: any) {
+      console.error('Error in delete process:', error);
       toast({
         title: "Erro ao excluir",
         description: error.message,
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Livro excluído",
-        description: "O livro foi removido com sucesso.",
-      });
-      fetchBooks();
     }
+  };
+
+  const handleProcessBook = async (id: string) => {
+    try {
+      toast({
+        title: "Iniciando processamento",
+        description: "O livro está sendo processado...",
+      });
+
+      await bookProcessingService.processBook(id);
+      
+      toast({
+        title: "Processamento concluído",
+        description: "O livro foi processado com sucesso.",
+      });
+      
+      fetchBooks();
+    } catch (error: any) {
+      toast({
+        title: "Erro no processamento",
+        description: error.message || "Ocorreu um erro ao processar o livro.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRefreshStatus = async () => {
+    await fetchBooks();
+    toast({
+      title: "Status atualizado",
+      description: "Lista de livros atualizada.",
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -235,9 +347,19 @@ export default function Admin() {
         {/* Statistics Card */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Estatísticas da Biblioteca
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                Estatísticas da Biblioteca
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshStatus}
+                title="Atualizar status"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -301,13 +423,36 @@ export default function Admin() {
                       {new Date(book.created_at).toLocaleDateString('pt-BR')}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteBook(book.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {book.status === 'uploading' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleProcessBook(book.id)}
+                            title="Processar livro"
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {book.status === 'processing' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleProcessBook(book.id)}
+                            title="Reprocessar livro"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteBook(book.id)}
+                          title="Excluir livro"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -2,11 +2,11 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, BookOpen, Wand2, Globe, Clock, Zap } from 'lucide-react';
+import { FileText, BookOpen, Wand2, Globe, Clock, Zap, LogIn, UserPlus } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 
 const Index = () => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
 
   return (
     <div className="container mx-auto px-4 py-12 space-y-16">
@@ -27,19 +27,46 @@ const Index = () => {
         </div>
         
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link to="/generator">
-            <Button size="lg" className="w-full sm:w-auto">
-              <Wand2 className="h-5 w-5 mr-2" />
-              Criar Roteiro Agora
-            </Button>
-          </Link>
-          {profile?.role === 'admin' && (
-            <Link to="/admin">
-              <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                <BookOpen className="h-5 w-5 mr-2" />
-                Gerenciar Biblioteca
-              </Button>
-            </Link>
+          {user ? (
+            // Usuário logado - mostrar botões de funcionalidades
+            <>
+              <Link to="/generator">
+                <Button size="lg" className="w-full sm:w-auto">
+                  <Wand2 className="h-5 w-5 mr-2" />
+                  Criar Roteiro Agora
+                </Button>
+              </Link>
+              <Link to="/scripts">
+                <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                  <FileText className="h-5 w-5 mr-2" />
+                  Meus Roteiros
+                </Button>
+              </Link>
+              {profile?.role === 'admin' && (
+                <Link to="/admin">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                    <BookOpen className="h-5 w-5 mr-2" />
+                    Gerenciar Biblioteca
+                  </Button>
+                </Link>
+              )}
+            </>
+          ) : (
+            // Usuário não logado - mostrar botões de login
+            <>
+              <Link to="/login">
+                <Button size="lg" className="w-full sm:w-auto">
+                  <LogIn className="h-5 w-5 mr-2" />
+                  Fazer Login
+                </Button>
+              </Link>
+              <Link to="/login">
+                <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                  <UserPlus className="h-5 w-5 mr-2" />
+                  Criar Conta
+                </Button>
+              </Link>
+            </>
           )}
         </div>
       </div>

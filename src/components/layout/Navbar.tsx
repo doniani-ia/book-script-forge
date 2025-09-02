@@ -1,15 +1,42 @@
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, BookOpen, LogOut, User } from 'lucide-react';
+import { FileText, BookOpen, LogOut, User, Loader2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { LLMSettings } from '@/components/settings/LLMSettings';
+import { ConnectionStatus } from '@/components/ConnectionStatus';
+import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 export const Navbar = () => {
   const { profile, signOut } = useAuth();
   const location = useLocation();
+  const { toast } = useToast();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    
+    const confirmed = window.confirm('Tem certeza que deseja sair do sistema?');
+    if (!confirmed) return;
+
+    try {
+      setIsSigningOut(true);
+      await signOut();
+      // AuthProvider will handle the redirect to home page
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      toast({
+        title: "Erro no logout",
+        description: "Ocorreu um erro ao fazer logout. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   return (
     <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -54,6 +81,7 @@ export const Navbar = () => {
           </div>
 
           <div className="flex items-center space-x-4">
+            <ConnectionStatus />
             <div className="flex items-center space-x-2">
               <User className="h-4 w-4" />
               <span className="text-sm font-medium">{profile?.display_name}</span>
@@ -62,9 +90,18 @@ export const Navbar = () => {
               </Badge>
             </div>
             <LLMSettings />
-            <Button onClick={signOut} variant="outline" size="sm">
-              <LogOut className="h-4 w-4 mr-2" />
-              Sair
+            <Button 
+              onClick={handleSignOut} 
+              variant="outline" 
+              size="sm"
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <LogOut className="h-4 w-4 mr-2" />
+              )}
+              {isSigningOut ? 'Saindo...' : 'Sair'}
             </Button>
           </div>
         </div>

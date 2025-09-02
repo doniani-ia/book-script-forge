@@ -6,9 +6,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { Navbar } from "@/components/layout/Navbar";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import Generator from "./pages/Generator";
 import Admin from "./pages/Admin";
+import Scripts from "./pages/Scripts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,18 +26,40 @@ const AppContent = () => {
     );
   }
 
-  if (!user) {
-    return <AuthForm />;
-  }
-
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
       <Routes>
+        {/* Rotas públicas */}
         <Route path="/" element={<Index />} />
-        <Route path="/generator" element={<Generator />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/scripts" element={<div className="container mx-auto px-4 py-8"><h1 className="text-2xl font-bold">Meus Roteiros (Em desenvolvimento)</h1></div>} />
+        <Route path="/login" element={<AuthForm />} />
+        
+        {/* Rotas protegidas */}
+        {user ? (
+          <>
+            <Route path="/generator" element={
+              <>
+                <Navbar />
+                <Generator />
+              </>
+            } />
+            <Route path="/admin" element={
+              <>
+                <Navbar />
+                <Admin />
+              </>
+            } />
+            <Route path="/scripts" element={
+              <>
+                <Navbar />
+                <Scripts />
+              </>
+            } />
+          </>
+        ) : (
+          // Redirecionar para login se tentar acessar rota protegida
+          <Route path="*" element={<AuthForm />} />
+        )}
+        
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
@@ -43,17 +67,19 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

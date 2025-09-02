@@ -7,8 +7,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Wand2, Clock, Globe, Mic, Volume2, Eye } from 'lucide-react';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { llmService } from '@/lib/llm-service';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Generator() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
   const [formData, setFormData] = useState({
     theme: '',
     duration: '',
@@ -19,28 +26,171 @@ export default function Generator() {
   
   const [loading, setLoading] = useState(false);
   const [generatedScript, setGeneratedScript] = useState<any>(null);
+  const [scriptId, setScriptId] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      toast({
+        title: "Erro",
+        description: "Você precisa estar logado para gerar roteiros.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     
-    // Simulate script generation
-    setTimeout(() => {
+    try {
+      // Initialize LLM service
+      await llmService.initialize(user.id);
+
+      // Create initial script record
+      const { data: scriptData, error: scriptError } = await supabase
+        .from('scripts')
+        .insert({
+          user_id: user.id,
+          title: `Roteiro: ${formData.theme.substring(0, 50)}...`,
+          theme: formData.theme,
+          duration_minutes: parseInt(formData.duration),
+          language_style: formData.languageStyle,
+          environment: formData.environment,
+          target_language: formData.targetLanguage,
+          status: 'draft'
+        })
+        .select()
+        .single();
+
+      if (scriptError) {
+        throw new Error(`Failed to create script: ${scriptError.message}`);
+      }
+
+      setScriptId(scriptData.id);
+
+      // Generate script using LLM
+      const response = await llmService.generateScript(
+        formData.theme,
+        parseInt(formData.duration),
+        formData.languageStyle,
+        formData.environment
+      );
+
+      // Parse the JSON response
+      let scriptContent;
+      try {
+        scriptContent = JSON.parse(response.content);
+      } catch (parseError) {
+        // If JSON parsing fails, create a structured response
+        scriptContent = {
+          title: `Roteiro: ${formData.theme}`,
+          content: response.content,
+          seo_title: `Roteiro: ${formData.theme}`,
+          seo_description: `Roteiro sobre ${formData.theme}`,
+          seo_tags: formData.theme.split(' ').slice(0, 5),
+          thumbnail_prompt: `Thumbnail para vídeo sobre ${formData.theme}`
+        };
+      }
+
+      // Update script with generated content
+      const { error: updateError } = await supabase
+        .from('scripts')
+        .update({
+          title: scriptContent.title,
+          content_portuguese: scriptContent.content,
+          seo_title: scriptContent.seo_title,
+          seo_description: scriptContent.seo_description,
+          seo_tags: scriptContent.seo_tags,
+          thumbnail_prompt: scriptContent.thumbnail_prompt,
+          status: 'draft'
+        })
+        .eq('id', scriptData.id);
+
+      if (updateError) {
+        throw new Error(`Failed to update script: ${updateError.message}`);
+      }
+
       setGeneratedScript({
-        title: 'Como Transformar Sua Vida Financeira',
-        contentPortuguese: 'Script gerado em português baseado nos livros indexados...',
-        seoTitle: 'Transforme Sua Vida Financeira em 30 Dias | Guia Completo',
-        seoDescription: 'Descubra as estratégias dos maiores investidores para transformar sua situação financeira.',
-        seoTags: ['finanças', 'investimentos', 'dinheiro', 'riqueza'],
-        thumbnailPrompt: 'Uma pessoa confiante segurando dinheiro com gráficos de crescimento ao fundo'
+        title: scriptContent.title,
+        contentPortuguese: scriptContent.content,
+        seoTitle: scriptContent.seo_title,
+        seoDescription: scriptContent.seo_description,
+        seoTags: scriptContent.seo_tags,
+        thumbnailPrompt: scriptContent.thumbnail_prompt
       });
+
+      toast({
+        title: "Sucesso",
+        description: "Roteiro gerado com sucesso!",
+      });
+
+    } catch (error: any) {
+      console.error('Error generating script:', error);
+      toast({
+        title: "Erro na geração",
+        description: error.message || "Ocorreu um erro ao gerar o roteiro.",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-    }, 3000);
+    }
   };
 
-  const handleApprove = () => {
-    // Here would be the logic to generate final script in target language
-    console.log('Script approved, generating final version...');
+  const handleApprove = async () => {
+    if (!user || !scriptId || !generatedScript) {
+      toast({
+        title: "Erro",
+        description: "Dados insuficientes para aprovar o roteiro.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Initialize LLM service
+      await llmService.initialize(user.id);
+
+      // Generate final script in target language
+      const response = await llmService.generateFinalScript(
+        generatedScript.contentPortuguese,
+        formData.targetLanguage
+      );
+
+      // Update script with final content
+      const { error: updateError } = await supabase
+        .from('scripts')
+        .update({
+          content_final: response.content,
+          status: 'final'
+        })
+        .eq('id', scriptId);
+
+      if (updateError) {
+        throw new Error(`Failed to update script: ${updateError.message}`);
+      }
+
+      // Update local state
+      setGeneratedScript({
+        ...generatedScript,
+        contentFinal: response.content
+      });
+
+      toast({
+        title: "Sucesso",
+        description: "Versão final gerada com sucesso!",
+      });
+
+    } catch (error: any) {
+      console.error('Error generating final script:', error);
+      toast({
+        title: "Erro na tradução",
+        description: error.message || "Ocorreu um erro ao gerar a versão final.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -202,6 +352,15 @@ export default function Generator() {
                   </div>
                 </div>
 
+                {generatedScript.contentFinal && (
+                  <div>
+                    <h3 className="font-semibold mb-2">Roteiro Final ({formData.targetLanguage})</h3>
+                    <div className="text-sm bg-green-50 dark:bg-green-950 p-4 rounded-lg max-h-40 overflow-y-auto border border-green-200 dark:border-green-800">
+                      {generatedScript.contentFinal}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <h3 className="font-semibold mb-2">SEO</h3>
                   <div className="space-y-2">
@@ -221,8 +380,14 @@ export default function Generator() {
                   <p className="text-sm bg-muted p-3 rounded-lg">{generatedScript.thumbnailPrompt}</p>
                 </div>
 
-                <Button onClick={handleApprove} className="w-full">
-                  Aprovar e Gerar Versão Final
+                <Button 
+                  onClick={handleApprove} 
+                  className="w-full"
+                  disabled={loading || generatedScript.contentFinal}
+                >
+                  {loading ? 'Gerando Versão Final...' : 
+                   generatedScript.contentFinal ? 'Versão Final Gerada' : 
+                   'Aprovar e Gerar Versão Final'}
                 </Button>
               </div>
             ) : (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,17 +6,36 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from './AuthProvider';
 
 export const AuthForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user, profile, loading } = useAuth();
+
+  // Redirect user after successful login based on their role
+  useEffect(() => {
+    if (user && profile && !loading) {
+      // Ensure role is a string and trim whitespace
+      const userRole = String(profile.role).trim().toLowerCase();
+      
+      // Force redirect based on role
+      if (userRole === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/generator');
+      }
+    }
+  }, [user, profile, loading, navigate]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsSubmitting(true);
 
     const { error } = await supabase.auth.signUp({
       email,
@@ -41,12 +60,12 @@ export const AuthForm = () => {
       });
     }
 
-    setLoading(false);
+    setIsSubmitting(false);
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsSubmitting(true);
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -59,9 +78,14 @@ export const AuthForm = () => {
         description: error.message,
         variant: "destructive",
       });
+    } else {
+      toast({
+        title: "Login realizado com sucesso",
+        description: "Redirecionando...",
+      });
     }
 
-    setLoading(false);
+    setIsSubmitting(false);
   };
 
   return (
@@ -102,8 +126,8 @@ export const AuthForm = () => {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Entrando...' : 'Entrar'}
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? 'Entrando...' : 'Entrar'}
                 </Button>
               </form>
             </TabsContent>
@@ -141,8 +165,8 @@ export const AuthForm = () => {
                     minLength={6}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Cadastrando...' : 'Cadastrar'}
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? 'Cadastrando...' : 'Cadastrar'}
                 </Button>
               </form>
             </TabsContent>
