@@ -21,23 +21,24 @@ export interface SupportedLanguage {
   code: string;
   name: string;
   nativeName: string;
+  portugueseName: string;
   flag: string;
 }
 
 export class TranslationService {
   private static readonly SUPPORTED_LANGUAGES: SupportedLanguage[] = [
-    { code: 'pt-BR', name: 'Portuguese (Brazil)', nativeName: 'Português (Brasil)', flag: '🇧🇷' },
-    { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
-    { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' },
-    { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷' },
-    { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪' },
-    { code: 'it', name: 'Italian', nativeName: 'Italiano', flag: '🇮🇹' },
-    { code: 'ja', name: 'Japanese', nativeName: '日本語', flag: '🇯🇵' },
-    { code: 'ko', name: 'Korean', nativeName: '한국어', flag: '🇰🇷' },
-    { code: 'zh', name: 'Chinese (Simplified)', nativeName: '中文 (简体)', flag: '🇨🇳' },
-    { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' },
-    { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦' },
-    { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳' }
+    { code: 'pt-BR', name: 'Portuguese (Brazil)', nativeName: 'Português (Brasil)', portugueseName: 'Português (Brasil)', flag: '🇧🇷' },
+    { code: 'en', name: 'English', nativeName: 'English', portugueseName: 'Inglês', flag: '🇺🇸' },
+    { code: 'es', name: 'Spanish', nativeName: 'Español', portugueseName: 'Espanhol', flag: '🇪🇸' },
+    { code: 'fr', name: 'French', nativeName: 'Français', portugueseName: 'Francês', flag: '🇫🇷' },
+    { code: 'de', name: 'German', nativeName: 'Deutsch', portugueseName: 'Alemão', flag: '🇩🇪' },
+    { code: 'it', name: 'Italian', nativeName: 'Italiano', portugueseName: 'Italiano', flag: '🇮🇹' },
+    { code: 'ja', name: 'Japanese', nativeName: '日本語', portugueseName: 'Japonês', flag: '🇯🇵' },
+    { code: 'ko', name: 'Korean', nativeName: '한국어', portugueseName: 'Coreano', flag: '🇰🇷' },
+    { code: 'zh', name: 'Chinese (Simplified)', nativeName: '中文 (简体)', portugueseName: 'Chinês', flag: '🇨🇳' },
+    { code: 'ru', name: 'Russian', nativeName: 'Русский', portugueseName: 'Russo', flag: '🇷🇺' },
+    { code: 'ar', name: 'Arabic', nativeName: 'العربية', portugueseName: 'Árabe', flag: '🇸🇦' },
+    { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', portugueseName: 'Hindi', flag: '🇮🇳' }
   ];
 
   static getSupportedLanguages(): SupportedLanguage[] {
@@ -50,7 +51,7 @@ export class TranslationService {
 
   static getLanguageName(code: string): string {
     const language = this.getLanguageByCode(code);
-    return language ? language.nativeName : code;
+    return language ? language.portugueseName : code;
   }
 
   async translateScript(

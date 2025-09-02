@@ -14,32 +14,47 @@ interface UserSettings {
   llm_provider: string;
   llm_model: string;
   openai_api_key?: string;
-  claude_api_key?: string;
-  gemini_api_key?: string;
 }
 
 const LLM_PROVIDERS = {
   openai: {
     name: 'OpenAI',
     models: [
-      { id: 'gpt-4o', name: 'GPT-4 Turbo' },
-      { id: 'gpt-4o-mini', name: 'GPT-4 Mini' },
-      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
-    ]
-  },
-  claude: {
-    name: 'Anthropic Claude',
-    models: [
-      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
-      { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
-      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' }
-    ]
-  },
-  gemini: {
-    name: 'Google Gemini',
-    models: [
-      { id: 'gemini-pro', name: 'Gemini Pro' },
-      { id: 'gemini-pro-vision', name: 'Gemini Pro Vision' }
+      { 
+        id: 'gpt-4o', 
+        name: 'GPT-4o', 
+        description: 'Modelo mais avançado com contexto de 128k tokens',
+        contextWindow: '128k tokens',
+        pricing: 'Premium'
+      },
+      { 
+        id: 'gpt-4o-mini', 
+        name: 'GPT-4o Mini', 
+        description: 'Modelo otimizado para custo-benefício com contexto de 128k tokens',
+        contextWindow: '128k tokens',
+        pricing: 'Econômico'
+      },
+      { 
+        id: 'gpt-4-turbo', 
+        name: 'GPT-4 Turbo', 
+        description: 'Versão turbo do GPT-4 com contexto de 128k tokens',
+        contextWindow: '128k tokens',
+        pricing: 'Premium'
+      },
+      { 
+        id: 'gpt-4', 
+        name: 'GPT-4', 
+        description: 'Modelo GPT-4 padrão com contexto de 8k tokens',
+        contextWindow: '8k tokens',
+        pricing: 'Premium'
+      },
+      { 
+        id: 'gpt-3.5-turbo', 
+        name: 'GPT-3.5 Turbo', 
+        description: 'Modelo rápido e econômico com contexto de 16k tokens',
+        contextWindow: '16k tokens',
+        pricing: 'Econômico'
+      }
     ]
   }
 };
@@ -54,9 +69,7 @@ export const LLMSettings = () => {
   const [settings, setSettings] = useState<UserSettings>({
     llm_provider: 'openai',
     llm_model: 'gpt-4o-mini',
-    openai_api_key: '',
-    claude_api_key: '',
-    gemini_api_key: ''
+    openai_api_key: ''
   });
 
   useEffect(() => {
@@ -84,9 +97,7 @@ export const LLMSettings = () => {
         setSettings({
           llm_provider: data.llm_provider || 'openai',
           llm_model: data.llm_model || 'gpt-4o-mini',
-          openai_api_key: data.openai_api_key || '',
-          claude_api_key: data.claude_api_key || '',
-          gemini_api_key: data.gemini_api_key || ''
+          openai_api_key: data.openai_api_key || ''
         });
       }
     } catch (error) {
@@ -112,9 +123,7 @@ export const LLMSettings = () => {
           user_id: user.id,
           llm_provider: settings.llm_provider,
           llm_model: settings.llm_model,
-          openai_api_key: settings.openai_api_key,
-          claude_api_key: settings.claude_api_key,
-          gemini_api_key: settings.gemini_api_key
+          openai_api_key: settings.openai_api_key
         }, {
           onConflict: 'user_id'
         });
@@ -214,21 +223,45 @@ export const LLMSettings = () => {
                     <SelectContent>
                       {currentProvider?.models.map((model) => (
                         <SelectItem key={model.id} value={model.id}>
-                          {model.name}
+                          <div className="flex flex-col">
+                            <span className="font-medium">{model.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {model.contextWindow} • {model.pricing}
+                            </span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  
+                  {/* Informações do modelo selecionado */}
+                  {currentProvider && (
+                    <div className="mt-2 p-3 bg-muted rounded-lg">
+                      {(() => {
+                        const selectedModel = currentProvider.models.find(m => m.id === settings.llm_model);
+                        return selectedModel ? (
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">{selectedModel.name}</p>
+                            <p className="text-xs text-muted-foreground">{selectedModel.description}</p>
+                            <div className="flex gap-4 text-xs text-muted-foreground">
+                              <span>Contexto: {selectedModel.contextWindow}</span>
+                              <span>Preço: {selectedModel.pricing}</span>
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* API Keys */}
+            {/* API Key */}
             <Card>
               <CardHeader>
-                <CardTitle>Chaves de API</CardTitle>
+                <CardTitle>Chave de API OpenAI</CardTitle>
                 <CardDescription>
-                  Configure suas chaves de API para cada provedor
+                  Configure sua chave de API da OpenAI para gerar roteiros
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -241,28 +274,9 @@ export const LLMSettings = () => {
                     value={settings.openai_api_key}
                     onChange={(e) => setSettings(prev => ({ ...prev, openai_api_key: e.target.value }))}
                   />
-                </div>
-
-                <div>
-                  <Label htmlFor="claude_key">Claude API Key</Label>
-                  <Input
-                    id="claude_key"
-                    type="password"
-                    placeholder="sk-ant-..."
-                    value={settings.claude_api_key}
-                    onChange={(e) => setSettings(prev => ({ ...prev, claude_api_key: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="gemini_key">Gemini API Key</Label>
-                  <Input
-                    id="gemini_key"
-                    type="password"
-                    placeholder="AIza..."
-                    value={settings.gemini_api_key}
-                    onChange={(e) => setSettings(prev => ({ ...prev, gemini_api_key: e.target.value }))}
-                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sua chave de API é armazenada de forma segura e usada apenas para gerar roteiros.
+                  </p>
                 </div>
               </CardContent>
             </Card>

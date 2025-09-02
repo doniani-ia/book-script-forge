@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,6 +8,7 @@ import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { Navbar } from "@/components/layout/Navbar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { DebugInfo } from "@/components/DebugInfo";
 import Index from "./pages/Index";
 import Generator from "./pages/Generator";
 import Admin from "./pages/Admin";
@@ -18,16 +20,52 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   const { user, loading } = useAuth();
 
-  if (loading) {
+  // Timeout de segurança para evitar loading infinito
+  const [showFallback, setShowFallback] = useState(false);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading) {
+        console.warn('Loading timeout reached, showing fallback');
+        setShowFallback(true);
+      }
+    }, 15000); // 15 segundos
+
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  if (loading && !showFallback) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback se o loading demorar muito
+  if (showFallback) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold">Erro de Carregamento</h1>
+          <p className="text-muted-foreground">A aplicação está demorando para carregar.</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+          >
+            Recarregar Página
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
+      <DebugInfo />
       <Routes>
         {/* Rotas públicas */}
         <Route path="/" element={<Index />} />

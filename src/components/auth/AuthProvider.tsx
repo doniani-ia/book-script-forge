@@ -52,33 +52,67 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        setUser(session.user);
-        setSession(session);
-        const profileData = await fetchProfile(session.user.id);
-        setProfile(profileData);
+      try {
+        // Adiciona timeout para evitar travamento
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 10000)
+        );
+        
+        const sessionPromise = supabase.auth.getSession();
+        
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        
+        if (session?.user) {
+          setUser(session.user);
+          setSession(session);
+          try {
+            const profileData = await fetchProfile(session.user.id);
+            setProfile(profileData);
+          } catch (profileError) {
+            console.warn('Error fetching profile, continuing without profile:', profileError);
+            setProfile(null);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting session:', error);
+        // Continua sem usuário em caso de erro
+        setUser(null);
+        setSession(null);
+        setProfile(null);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
 
     getSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session?.user) {
-          setUser(session.user);
-          setSession(session);
-          const profileData = await fetchProfile(session.user.id);
-          setProfile(profileData);
-        } else {
+        try {
+          if (session?.user) {
+            setUser(session.user);
+            setSession(session);
+            try {
+              const profileData = await fetchProfile(session.user.id);
+              setProfile(profileData);
+            } catch (profileError) {
+              console.warn('Error fetching profile in auth state change:', profileError);
+              setProfile(null);
+            }
+          } else {
+            setUser(null);
+            setSession(null);
+            setProfile(null);
+          }
+        } catch (error) {
+          console.error('Error in auth state change:', error);
+          // Em caso de erro, limpa o estado
           setUser(null);
           setSession(null);
           setProfile(null);
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 

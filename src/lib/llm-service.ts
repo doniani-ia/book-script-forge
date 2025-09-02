@@ -22,13 +22,34 @@ export interface UserSettings {
   llm_provider: string;
   llm_model: string;
   openai_api_key?: string;
-  claude_api_key?: string;
-  gemini_api_key?: string;
 }
 
 export class LLMService {
   private settings: UserSettings | null = null;
   private currentUserId: string | null = null;
+
+  /**
+   * Calcula o tamanho do roteiro baseado na duração do vídeo
+   * Fórmula: 160 palavras por minuto × 8 caracteres por palavra (incluindo espaços)
+   * Adiciona 10% a mais na duração para cálculo mais preciso
+   * @param durationMinutes Duração do vídeo em minutos
+   * @returns Objeto com palavras e caracteres calculados
+   */
+  private calculateScriptSize(durationMinutes: number): { words: number; characters: number } {
+    const wordsPerMinute = 160;
+    const charactersPerWord = 8; // Incluindo espaços
+    
+    // Adiciona 10% a mais na duração para cálculo mais preciso
+    const adjustedDuration = durationMinutes * 1.1;
+    
+    const totalWords = adjustedDuration * wordsPerMinute;
+    const totalCharacters = totalWords * charactersPerWord;
+    
+    return {
+      words: Math.round(totalWords),
+      characters: Math.round(totalCharacters)
+    };
+  }
 
   async initialize(userId: string): Promise<void> {
     this.currentUserId = userId;
@@ -46,9 +67,7 @@ export class LLMService {
     this.settings = data || {
       llm_provider: 'openai',
       llm_model: 'gpt-4o-mini',
-      openai_api_key: '',
-      claude_api_key: '',
-      gemini_api_key: ''
+      openai_api_key: ''
     };
   }
 
@@ -77,38 +96,41 @@ export class LLMService {
 
     const prompt = this.buildScriptPrompt(theme, duration, languageStyle, environment, environmentDescription, ragContent);
 
-    switch (this.settings.llm_provider) {
-      case 'openai':
-        return this.callOpenAI(prompt);
-      case 'claude':
-        return this.callClaude(prompt);
-      case 'gemini':
-        return this.callGemini(prompt);
-      default:
-        throw new Error(`Unsupported LLM provider: ${this.settings.llm_provider}`);
+    // Apenas OpenAI é suportado
+    if (this.settings.llm_provider !== 'openai') {
+      throw new Error('Apenas OpenAI é suportado atualmente');
     }
+    
+    return this.callOpenAI(prompt);
   }
 
   async generateFinalScript(
     portugueseScript: string,
-    targetLanguage: string
+    targetLanguage: string,
+    seoTitle?: string,
+    seoDescription?: string,
+    seoTags?: string[],
+    thumbnailPrompt?: string
   ): Promise<LLMResponse> {
     if (!this.settings) {
       throw new Error('LLMService not initialized');
     }
 
-    const prompt = this.buildTranslationPrompt(portugueseScript, targetLanguage);
+    const prompt = this.buildTranslationPrompt(
+      portugueseScript, 
+      targetLanguage, 
+      seoTitle, 
+      seoDescription, 
+      seoTags, 
+      thumbnailPrompt
+    );
 
-    switch (this.settings.llm_provider) {
-      case 'openai':
-        return this.callOpenAI(prompt);
-      case 'claude':
-        return this.callClaude(prompt);
-      case 'gemini':
-        return this.callGemini(prompt);
-      default:
-        throw new Error(`Unsupported LLM provider: ${this.settings.llm_provider}`);
+    // Apenas OpenAI é suportado
+    if (this.settings.llm_provider !== 'openai') {
+      throw new Error('Apenas OpenAI é suportado atualmente');
     }
+    
+    return this.callOpenAI(prompt);
   }
 
   private buildScriptPrompt(
@@ -127,26 +149,45 @@ export class LLMService {
       ? `\n\nDESCRIÇÃO DETALHADA DO AMBIENTE:\n${environmentDescription}`
       : '';
 
+    // Calcula o tamanho do roteiro baseado na duração
+    const scriptSize = this.calculateScriptSize(duration);
+
     return `Você é um especialista em criação de roteiros para YouTube. Crie um roteiro envolvente e bem estruturado baseado nas informações fornecidas.
 
 TEMA: ${theme}
 DURAÇÃO: ${duration} minutos
 ESTILO DE LINGUAGEM: ${languageStyle}
-AMBIENTE: ${environment}${environmentContext}${contentContext}
+AMBIENTE: ${environment} ${environmentContext} ${contentContext}
 
-INSTRUÇÕES:
-1. Crie um roteiro estruturado com introdução, desenvolvimento e conclusão
-2. Use o estilo de linguagem ${languageStyle}
-3. Mantenha o ambiente ${environment} ao longo do vídeo${environmentDescription ? '\n4. Incorpore os detalhes específicos da descrição do ambiente fornecida' : ''}
-${environmentDescription ? '5' : '4'}. Inclua elementos de engajamento (perguntas, call-to-actions)
-${environmentDescription ? '6' : '5'}. Estruture o conteúdo para ${duration} minutos de duração
-${environmentDescription ? '7' : '6'}. Use sempre as informações dos livros para enriquecer o conteúdo
-${environmentDescription ? '8' : '7'}. O Roteiro precisa estar sem descrições de capítulos, apenas o conteúdo do vídeo
+⚠️ ESPECIFICAÇÕES CRÍTICAS DE TAMANHO DO ROTEIRO ⚠️
+- DURAÇÃO DO VÍDEO: ${duration} minutos
+- PALAVRAS OBRIGATÓRIAS: EXATAMENTE ${scriptSize.words} palavras
+- CARACTERES OBRIGATÓRIOS: EXATAMENTE ${scriptSize.characters.toLocaleString()} caracteres (incluindo espaços)
+- VELOCIDADE DE NARRAÇÃO: 160 palavras por minuto (padrão para vídeos)
+- CARACTERES POR PALAVRA: 8 caracteres (incluindo espaços)
+
+🎯 INSTRUÇÕES OBRIGATÓRIAS:
+1. O roteiro DEVE ter EXATAMENTE ${scriptSize.words} palavras para ${duration} minutos de vídeo
+2. O roteiro DEVE ter EXATAMENTE ${scriptSize.characters.toLocaleString()} caracteres (incluindo espaços)
+3. Crie um roteiro estruturado com introdução, desenvolvimento e conclusão
+4. Use o estilo de linguagem ${languageStyle}
+5. Mantenha o ambiente ${environment} ao longo do vídeo
+6. Inclua elementos de engajamento (perguntas, call-to-actions)
+7. Use sempre as informações dos livros em RAG para enriquecer o conteúdo do roteiro
+8. O roteiro deve conter apenas o conteúdo do vídeo, sem descrições de capítulos
+9. Mantenha a linguagem fluida, natural e própria para narração
+10. Incorpore os detalhes específicos da descrição do ambiente fornecida ${environmentDescription}
+
+📏 CONTROLE DE QUALIDADE:
+- Conte as palavras e caracteres do roteiro antes de finalizar
+- Se estiver muito curto, adicione mais conteúdo relevante
+- Se estiver muito longo, edite para reduzir mantendo a qualidade
+- O tamanho é CRÍTICO para a duração do vídeo
 
 FORMATO DE RESPOSTA (JSON):
 {
   "title": "Título atrativo do vídeo",
-  "content": "Roteiro completo em português brasileiro",
+  "content": "Roteiro completo em português brasileiro com EXATAMENTE ${scriptSize.words} palavras e ${scriptSize.characters.toLocaleString()} caracteres",
   "seo_title": "Título otimizado para SEO",
   "seo_description": "Descrição otimizada para SEO (máx 160 caracteres)",
   "seo_tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
@@ -156,20 +197,43 @@ FORMATO DE RESPOSTA (JSON):
 Responda APENAS com o JSON válido, sem texto adicional.`;
   }
 
-  private buildTranslationPrompt(portugueseScript: string, targetLanguage: string): string {
+  private buildTranslationPrompt(
+    portugueseScript: string, 
+    targetLanguage: string,
+    seoTitle?: string,
+    seoDescription?: string,
+    seoTags?: string[],
+    thumbnailPrompt?: string
+  ): string {
     const languageNames = {
       'en': 'inglês',
       'es': 'espanhol',
       'fr': 'francês',
+      'de': 'alemão',
+      'it': 'italiano',
+      'ja': 'japonês',
+      'ko': 'coreano',
+      'zh': 'chinês',
+      'ru': 'russo',
+      'ar': 'árabe',
+      'hi': 'hindi',
       'pt-BR': 'português brasileiro'
     };
 
     const targetLangName = languageNames[targetLanguage as keyof typeof languageNames] || targetLanguage;
 
-    return `Traduza o seguinte roteiro de YouTube do português brasileiro para ${targetLangName}.
+    const additionalContent = seoTitle || seoDescription || seoTags || thumbnailPrompt 
+      ? `\n\nCONTEÚDO ADICIONAL PARA TRADUZIR:\n` +
+        (seoTitle ? `TÍTULO SEO: ${seoTitle}\n` : '') +
+        (seoDescription ? `DESCRIÇÃO SEO: ${seoDescription}\n` : '') +
+        (seoTags ? `TAGS SEO: ${seoTags.join(', ')}\n` : '') +
+        (thumbnailPrompt ? `PROMPT THUMBNAIL: ${thumbnailPrompt}\n` : '')
+      : '';
+
+    return `Traduza o seguinte conteúdo de YouTube do português brasileiro para ${targetLangName}.
 
 ROTEIRO ORIGINAL:
-${portugueseScript}
+${portugueseScript}${additionalContent}
 
 INSTRUÇÕES:
 1. Mantenha a estrutura e formatação do roteiro
@@ -177,8 +241,18 @@ INSTRUÇÕES:
 3. Preserve o tom e estilo do conteúdo original
 4. Mantenha elementos de engajamento (perguntas, call-to-actions)
 5. Certifique-se de que a tradução soe natural no idioma de destino
+6. Traduza também todos os elementos SEO e prompts fornecidos
 
-Responda APENAS com o roteiro traduzido, sem texto adicional.`;
+FORMATO DE RESPOSTA (JSON):
+{
+  "content": "Roteiro traduzido completo",
+  "seo_title": "Título SEO traduzido",
+  "seo_description": "Descrição SEO traduzida",
+  "seo_tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "thumbnail_prompt": "Prompt para thumbnail traduzido"
+}
+
+Responda APENAS com o JSON válido, sem texto adicional.`;
   }
 
   private async callOpenAI(prompt: string): Promise<LLMResponse> {
@@ -223,92 +297,7 @@ Responda APENAS com o roteiro traduzido, sem texto adicional.`;
     };
   }
 
-  private async callClaude(prompt: string): Promise<LLMResponse> {
-    if (!this.settings?.claude_api_key) {
-      throw new Error('Claude API key not configured');
-    }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': this.settings.claude_api_key,
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: this.settings.llm_model,
-        max_tokens: 4000,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Claude API error: ${error.error?.message || 'Unknown error'}`);
-    }
-
-    const data = await response.json();
-    const content = data.content[0]?.text;
-
-    if (!content) {
-      throw new Error('No content received from Claude');
-    }
-
-    return {
-      content,
-      usage: data.usage
-    };
-  }
-
-  private async callGemini(prompt: string): Promise<LLMResponse> {
-    if (!this.settings?.gemini_api_key) {
-      throw new Error('Gemini API key not configured');
-    }
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.settings.llm_model}:generateContent?key=${this.settings.gemini_api_key}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4000,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Gemini API error: ${error.error?.message || 'Unknown error'}`);
-    }
-
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!content) {
-      throw new Error('No content received from Gemini');
-    }
-
-    return {
-      content,
-      usage: data.usageMetadata
-    };
-  }
 }
 
 // Singleton instance
