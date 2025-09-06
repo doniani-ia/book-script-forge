@@ -51,6 +51,69 @@ export class LLMService {
     };
   }
 
+  /**
+   * Retorna a descrição detalhada do ambiente para enriquecer o prompt
+   * @param environment Código do ambiente
+   * @returns Descrição detalhada do ambiente
+   */
+  private getEnvironmentDescription(environment: string): string {
+    const environmentDescriptions: Record<string, string> = {
+      'calmo': 'Tom sereno e relaxante, ritmo pausado, linguagem suave e contemplativa.',
+      'suspense': 'Tom tenso e misterioso, ritmo crescente, linguagem que cria expectativa e curiosidade.',
+      'motivacional': 'Tom energético e inspirador, ritmo dinâmico, linguagem que motiva e empodera.',
+      'educativo': 'Tom didático e claro, ritmo moderado, linguagem explicativa e acessível.',
+      'picante-sensual': 'Tom envolvente e instigante, apelo emocional forte, linguagem sedutora e provocativa.',
+      'romantico': 'Tom suave e apaixonado, focado em sentimentos, linguagem poética e emotiva.',
+      'saude-bem-estar': 'Tom confiável e empático, linguagem clara e acolhedora, foco no cuidado pessoal.',
+      'fitness-energia': 'Tom energético e motivador, ritmo acelerado, linguagem que incentiva movimento e ação.',
+      'infantil-divertido': 'Tom leve e colorido, cheio de curiosidade, linguagem simples e lúdica.',
+      'comedia-humoristico': 'Tom descontraído e divertido, com piadas e leveza, ritmo descontraído.',
+      'inspiracional-superacao': 'Tom épico e emocionante, com histórias de superação, linguagem inspiradora.',
+      'tecnologico-futurista': 'Tom inovador e moderno, foco em tecnologia, linguagem técnica mas acessível.',
+      'espiritual-reflexivo': 'Tom sereno e meditativo, foco na conexão interior, linguagem contemplativa.',
+      'noticioso-jornalistico': 'Tom direto e informativo, imparcial, linguagem objetiva e factual.',
+      'luxo-exclusivo': 'Tom elegante e refinado, linguagem premium e sofisticada.',
+      'misterioso-investigativo': 'Tom enigmático e intrigante, com suspense narrativo, linguagem investigativa.',
+      'aventura-epico': 'Tom explorador e energético, cheio de descobertas, linguagem épica e aventurosa.',
+      'dramatico': 'Tom intenso e emocional, com viradas inesperadas, linguagem dramática e impactante.',
+      'polemico-provocativo': 'Tom instigante e questionador, que mexe com crenças, linguagem provocativa e reflexiva.'
+    };
+
+    return environmentDescriptions[environment] || 'Tom neutro e equilibrado.';
+  }
+
+  /**
+   * Retorna a descrição detalhada do estilo de linguagem para enriquecer o prompt
+   * @param languageStyle Código do estilo de linguagem
+   * @returns Descrição detalhada do estilo de linguagem
+   */
+  private getLanguageStyleDescription(languageStyle: string): string {
+    const languageStyleDescriptions: Record<string, string> = {
+      'formal': 'Linguagem culta, objetiva, sem gírias, vocabulário elevado e estruturado.',
+      'descontraida': 'Linguagem leve, próxima, com expressões cotidianas e informalidade.',
+      'narrativa': 'Estilo de contar histórias, com começo, meio e fim, narrativa envolvente.',
+      'inspiracional': 'Cheio de frases motivadoras e positivas, linguagem que inspira e motiva.',
+      'tecnica-profissional': 'Voltada para especialistas, com termos técnicos e precisão profissional.',
+      'didatica-educacional': 'Passo a passo, explicativa, simples de entender, didática e clara.',
+      'poetica': 'Frases ritmadas, metáforas, estilo literário e expressivo.',
+      'humoristica': 'Engraçada, com trocadilhos, exageros leves e humor inteligente.',
+      'polemica-provocativa': 'Questionadora, que gera debate, linguagem provocativa e reflexiva.',
+      'sedutora-picante': 'Envolvente, sugestiva, atraente, linguagem sedutora e instigante.',
+      'emocional': 'Explorando sentimentos, empatia e sensibilidade, linguagem emotiva.',
+      'autoritaria-direta': 'Firme, impositiva, sem rodeios, linguagem direta e assertiva.',
+      'conversacional': 'Como se fosse um bate-papo entre amigos, linguagem coloquial e próxima.',
+      'epica-grandiosa': 'Com impacto, frases fortes, estilo "trailer de cinema", linguagem épica.',
+      'minimalista': 'Curta, direta, poucas palavras de efeito, linguagem concisa e impactante.',
+      'cientifica': 'Baseada em dados, números e estudos, linguagem precisa e factual.',
+      'reflexiva-filosofica': 'Convida a pensar, com perguntas abertas, linguagem contemplativa.',
+      'espiritual': 'Calma, profunda, ligada à fé ou autoconhecimento, linguagem serena.',
+      'ironica-sarcastica': 'Crítica com humor ácido, linguagem irônica e inteligente.',
+      'jornalistica-informativa': 'Objetiva, imparcial, estilo reportagem, linguagem factual.'
+    };
+
+    return languageStyleDescriptions[languageStyle] || 'Linguagem neutra e equilibrada.';
+  }
+
   async initialize(userId: string): Promise<void> {
     this.currentUserId = userId;
     
@@ -149,6 +212,10 @@ export class LLMService {
       ? `\n\nDESCRIÇÃO DETALHADA DO AMBIENTE:\n${environmentDescription}`
       : '';
 
+    // Obtém as descrições detalhadas do ambiente e estilo de linguagem
+    const environmentDetails = this.getEnvironmentDescription(environment);
+    const languageStyleDetails = this.getLanguageStyleDescription(languageStyle);
+
     // Calcula o tamanho do roteiro baseado na duração
     const scriptSize = this.calculateScriptSize(duration);
 
@@ -156,8 +223,8 @@ export class LLMService {
 
 TEMA: ${theme}
 DURAÇÃO: ${duration} minutos
-ESTILO DE LINGUAGEM: ${languageStyle}
-AMBIENTE: ${environment} ${environmentContext} ${contentContext}
+ESTILO DE LINGUAGEM: ${languageStyle} - ${languageStyleDetails}
+AMBIENTE: ${environment} - ${environmentDetails}${environmentContext}${contentContext}
 
 ⚠️ ESPECIFICAÇÕES CRÍTICAS DE TAMANHO DO ROTEIRO ⚠️
 - DURAÇÃO DO VÍDEO: ${duration} minutos
@@ -170,13 +237,14 @@ AMBIENTE: ${environment} ${environmentContext} ${contentContext}
 1. O roteiro DEVE ter EXATAMENTE ${scriptSize.words} palavras para ${duration} minutos de vídeo
 2. O roteiro DEVE ter EXATAMENTE ${scriptSize.characters.toLocaleString()} caracteres (incluindo espaços)
 3. Crie um roteiro estruturado com introdução, desenvolvimento e conclusão
-4. Use o estilo de linguagem ${languageStyle}
-5. Mantenha o ambiente ${environment} ao longo do vídeo
+4. Use o estilo de linguagem ${languageStyle} - ${languageStyleDetails}
+5. Mantenha o ambiente ${environment} - ${environmentDetails} ao longo do vídeo
 6. Inclua elementos de engajamento (perguntas, call-to-actions)
 7. Use sempre as informações dos livros em RAG para enriquecer o conteúdo do roteiro
 8. O roteiro deve conter apenas o conteúdo do vídeo, sem descrições de capítulos
 9. Mantenha a linguagem fluida, natural e própria para narração
 10. Incorpore os detalhes específicos da descrição do ambiente fornecida ${environmentDescription}
+11. Adapte o vocabulário e estrutura das frases conforme o estilo de linguagem selecionado
 
 📏 CONTROLE DE QUALIDADE:
 - Conte as palavras e caracteres do roteiro antes de finalizar

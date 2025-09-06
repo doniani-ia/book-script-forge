@@ -1,0 +1,57 @@
+import React from 'react';
+
+interface ScriptForgeIconProps {
+  className?: string;
+  size?: number;
+}
+
+export const ScriptForgeIcon: React.FC<ScriptForgeIconProps> = ({ 
+  className = "", 
+  size = 32 
+}) => {
+  return (
+    <svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 32 32" 
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      {/* Background circle */}
+      <circle cx="16" cy="16" r="16" fill="url(#gradient)" />
+      
+      {/* Document/Paper */}
+      <rect x="8" y="6" width="12" height="16" rx="2" fill="white" stroke="#1f2937" strokeWidth="1.5"/>
+      
+      {/* Document lines */}
+      <line x1="10" y1="10" x2="18" y2="10" stroke="#1f2937" strokeWidth="1" strokeLinecap="round"/>
+      <line x1="10" y1="12" x2="16" y2="12" stroke="#1f2937" strokeWidth="1" strokeLinecap="round"/>
+      <line x1="10" y1="14" x2="18" y2="14" stroke="#1f2937" strokeWidth="1" strokeLinecap="round"/>
+      <line x1="10" y1="16" x2="15" y2="16" stroke="#1f2937" strokeWidth="1" strokeLinecap="round"/>
+      
+      {/* Hammer head */}
+      <rect x="20" y="8" width="4" height="3" rx="1" fill="#dc2626" stroke="#1f2937" strokeWidth="1"/>
+      
+      {/* Hammer handle */}
+      <rect x="21.5" y="11" width="1" height="8" rx="0.5" fill="#92400e" stroke="#1f2937" strokeWidth="1"/>
+      
+      {/* Hammer handle grip */}
+      <rect x="21" y="17" width="2" height="2" rx="0.5" fill="#a16207" stroke="#1f2937" strokeWidth="1"/>
+      
+      {/* Sparkles/Forge effect */}
+      <circle cx="22" cy="6" r="1" fill="#fbbf24" opacity="0.8"/>
+      <circle cx="25" cy="9" r="0.8" fill="#f59e0b" opacity="0.6"/>
+      <circle cx="19" cy="7" r="0.6" fill="#fbbf24" opacity="0.7"/>
+      
+      {/* Gradient definition */}
+      <defs>
+        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style={{stopColor:'#3b82f6', stopOpacity:1}} />
+          <stop offset="50%" style={{stopColor:'#1d4ed8', stopOpacity:1}} />
+          <stop offset="100%" style={{stopColor:'#1e40af', stopOpacity:1}} />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+};

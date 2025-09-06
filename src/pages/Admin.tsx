@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, BookOpen, Trash2, FileText, Loader2, Play, RefreshCw, Shield } from 'lucide-react';
+import { Upload, BookOpen, Trash2, FileText, Loader2, Play, RefreshCw, Shield, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { bookProcessingService } from '@/lib/book-processing-service';
@@ -28,6 +29,8 @@ export default function Admin() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     author: '',
@@ -76,6 +79,18 @@ export default function Admin() {
     setLoading(false);
   };
 
+  const updateBooksTable = async () => {
+    // Silent update without loading state
+    const { data, error } = await supabase
+      .from('books')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setBooks(data as Book[]);
+    }
+  };
+
   useEffect(() => {
     fetchBooks();
   }, []);
@@ -88,21 +103,29 @@ export default function Admin() {
     if (!isAllowedFileType(formData.file.name)) {
       toast({
         title: "Tipo de arquivo não suportado",
-        description: "Apenas PDF, TXT, DOC, DOCX e EPUB são permitidos.",
+        description: "Apenas PDF, TXT, DOC e DOCX são permitidos.",
         variant: "destructive",
       });
       return;
     }
 
     setUploading(true);
+    setUploadProgress(0);
+    setCurrentStep('Preparando upload...');
 
     try {
-      // Generate unique filename
+      // Step 1: Generate unique filename
+      setCurrentStep('Gerando nome único do arquivo...');
+      setUploadProgress(10);
       const fileName = generateUniqueFilename(formData.file.name);
       const filePath = `books/${fileName}`;
       const fileExt = getFileExtension(formData.file.name);
 
+      // Step 2: Upload file to storage
+      setCurrentStep('Fazendo upload do arquivo...');
+      setUploadProgress(20);
       console.log('Uploading file to storage:', filePath);
+      
       const { error: uploadError } = await supabase.storage
         .from('books')
         .upload(filePath, formData.file);
@@ -112,10 +135,15 @@ export default function Admin() {
         throw uploadError;
       }
       
+      setUploadProgress(40);
+      setCurrentStep('Upload concluído!');
       console.log('File uploaded successfully to storage');
 
-      // Then create book record
+      // Step 3: Create book record
+      setCurrentStep('Criando registro no banco de dados...');
+      setUploadProgress(50);
       console.log('Creating book record in database');
+      
       const { error: insertError } = await supabase
         .from('books')
         .insert({
@@ -133,10 +161,18 @@ export default function Admin() {
         throw insertError;
       }
       
+      setUploadProgress(60);
+      setCurrentStep('Registro criado com sucesso!');
       console.log('Book record created successfully');
+      
+      // Update table to show the new book
+      await updateBooksTable();
 
-      // Get the inserted book ID for processing
+      // Step 4: Get book ID for processing
+      setCurrentStep('Preparando processamento...');
+      setUploadProgress(70);
       console.log('Getting book ID for processing');
+      
       const { data: insertedBook } = await supabase
         .from('books')
         .select('id')
@@ -144,17 +180,49 @@ export default function Admin() {
         .single();
 
       if (insertedBook) {
+        setCurrentStep('Iniciando processamento do livro...');
+        setUploadProgress(80);
         console.log('Starting automatic processing for book:', insertedBook.id);
-        // Start processing automatically
+        
+        // Start processing automatically with progress callback
         try {
-          await bookProcessingService.processBook(insertedBook.id);
+          await bookProcessingService.processBook(insertedBook.id, async (step, progress) => {
+            setCurrentStep(step);
+            setUploadProgress(80 + (progress * 0.2)); // 80-100% range for processing
+            
+            // Update table at key processing milestones
+            if (step.includes('Atualizando status para processamento')) {
+              await updateBooksTable();
+            } else if (step.includes('Gerando embedding') && step.includes('/')) {
+              // Extract current embedding number from step like "Gerando embedding 5/10..."
+              const match = step.match(/Gerando embedding (\d+)\/(\d+)/);
+              if (match) {
+                const current = parseInt(match[1]);
+                const total = parseInt(match[2]);
+                // Update table when we're processing the last embedding
+                if (current === total) {
+                  await updateBooksTable();
+                }
+              }
+            } else if (step.includes('Finalizando processamento')) {
+              await updateBooksTable();
+            }
+          });
+          setUploadProgress(100);
+          setCurrentStep('Processamento concluído com sucesso!');
           console.log('Book processing completed successfully');
+          
+          // Final update when everything is complete
+          await updateBooksTable();
         } catch (processError) {
           console.error('Error processing book:', processError);
-          // Don't throw here, just log the error
+          setCurrentStep('Erro no processamento - livro salvo mas não processado');
+          // Update table to show error status
+          await updateBooksTable();
         }
       } else {
         console.error('Could not find inserted book for processing');
+        setCurrentStep('Erro: livro não encontrado para processamento');
       }
 
       toast({
@@ -163,9 +231,9 @@ export default function Admin() {
       });
 
       setFormData({ title: '', author: '', file: null });
-      fetchBooks();
 
     } catch (error: any) {
+      setCurrentStep('Erro no upload');
       toast({
         title: "Erro no upload",
         description: error.message,
@@ -174,6 +242,11 @@ export default function Admin() {
     }
 
     setUploading(false);
+    // Reset progress after a delay
+    setTimeout(() => {
+      setUploadProgress(0);
+      setCurrentStep('');
+    }, 3000);
   };
 
   const handleDeleteBook = async (id: string) => {
@@ -210,12 +283,20 @@ export default function Admin() {
 
   const handleProcessBook = async (id: string) => {
     try {
+      // Ativar barra de progresso para reprocessamento
+      setUploading(true);
+      setUploadProgress(0);
+      setCurrentStep('Iniciando reprocessamento...');
+
       toast({
         title: "Iniciando processamento",
         description: "O livro está sendo processado...",
       });
 
-      await bookProcessingService.processBook(id);
+      await bookProcessingService.processBook(id, (step, progress) => {
+        setCurrentStep(step);
+        setUploadProgress(progress);
+      });
       
       toast({
         title: "Processamento concluído",
@@ -229,6 +310,11 @@ export default function Admin() {
         description: error.message || "Ocorreu um erro ao processar o livro.",
         variant: "destructive",
       });
+    } finally {
+      // Desativar barra de progresso
+      setUploading(false);
+      setUploadProgress(0);
+      setCurrentStep('');
     }
   };
 
@@ -287,7 +373,7 @@ export default function Admin() {
               Adicionar Novo Livro
             </CardTitle>
             <CardDescription>
-              Faça upload de livros em PDF, DOC, EPUB ou TXT
+              Faça upload de livros em PDF, DOC, DOCX ou TXT
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -318,20 +404,22 @@ export default function Admin() {
                 <Input
                   id="file"
                   type="file"
-                  accept=".pdf,.doc,.docx,.epub,.txt"
+                  accept=".pdf,.doc,.docx,.txt"
                   onChange={(e) => setFormData({...formData, file: e.target.files?.[0] || null})}
                   required
                 />
                 <p className="text-xs text-muted-foreground">
-                  Formatos aceitos: PDF, DOC, DOCX, EPUB, TXT (máx. 50MB)
+                  Formatos aceitos: PDF, DOC, DOCX, TXT (máx. 50MB)
                 </p>
               </div>
+
+
 
               <Button type="submit" className="w-full" disabled={uploading}>
                 {uploading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Enviando...
+                    Processando...
                   </>
                 ) : (
                   <>
@@ -363,6 +451,25 @@ export default function Admin() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Progress Section */}
+            {uploading && (
+              <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-blue-700 dark:text-blue-300">Progresso do Upload</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-mono">{uploadProgress.toFixed(2)}%</span>
+                </div>
+                <Progress value={uploadProgress} className="w-full" />
+                <div className="flex items-center gap-2 text-sm">
+                  {uploadProgress < 100 ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  )}
+                  <span className="text-blue-700 dark:text-blue-300">{currentStep}</span>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center p-4 bg-muted rounded-lg">
                 <div className="text-2xl font-bold text-primary">

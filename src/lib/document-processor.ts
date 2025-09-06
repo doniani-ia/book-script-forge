@@ -1,4 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
+// Temporarily disabled - these libraries don't work in the browser
+// import * as pdfParse from 'pdf-parse';
+// import * as mammoth from 'mammoth';
 
 export interface ProcessingResult {
   success: boolean;
@@ -16,9 +19,10 @@ export class DocumentProcessor {
   private readonly CHUNK_SIZE = 1000; // characters per chunk
   private readonly CHUNK_OVERLAP = 200; // overlap between chunks
 
-  async processBook(bookId: string): Promise<ProcessingResult> {
+  async processBook(bookId: string, onProgress?: (step: string, progress: number) => void): Promise<ProcessingResult> {
     try {
       console.log(`[DocumentProcessor] Starting processing for book: ${bookId}`);
+      onProgress?.('Buscando informações do livro...', 5);
       
       // Get book information
       const { data: book, error: bookError } = await supabase
@@ -33,37 +37,44 @@ export class DocumentProcessor {
       }
       
       console.log(`[DocumentProcessor] Book found:`, book.title, book.file_path);
+      onProgress?.('Atualizando status para processamento...', 10);
 
       // Update status to processing
       console.log(`[DocumentProcessor] Updating status to processing`);
       await this.updateBookStatus(bookId, 'processing');
 
       // Download file from storage
+      onProgress?.('Baixando arquivo do storage...', 15);
       console.log(`[DocumentProcessor] Downloading file from storage: ${book.file_path}`);
       const fileContent = await this.downloadFile(book.file_path);
       console.log(`[DocumentProcessor] File downloaded, size: ${fileContent.byteLength} bytes`);
 
       // Extract text based on file type
+      onProgress?.('Extraindo texto do arquivo...', 25);
       console.log(`[DocumentProcessor] Extracting text from ${book.file_type} file`);
       const extractedText = await this.extractText(fileContent, book.file_type);
       console.log(`[DocumentProcessor] Text extracted, length: ${extractedText.length} characters`);
 
       // Split into chunks
+      onProgress?.('Dividindo texto em chunks...', 35);
       console.log(`[DocumentProcessor] Splitting text into chunks`);
       const chunks = this.splitIntoChunks(extractedText);
       console.log(`[DocumentProcessor] Created ${chunks.length} chunks`);
 
       // Generate embeddings for each chunk using the user's API key
+      onProgress?.('Gerando embeddings para busca semântica...', 50);
       console.log(`[DocumentProcessor] Generating embeddings for ${chunks.length} chunks`);
-      const chunksWithEmbeddings = await this.generateEmbeddings(chunks, book.uploaded_by);
+      const chunksWithEmbeddings = await this.generateEmbeddings(chunks, book.uploaded_by, onProgress);
       console.log(`[DocumentProcessor] Generated embeddings for ${chunksWithEmbeddings.length} chunks`);
 
       // Save chunks to database
+      onProgress?.('Salvando chunks no banco de dados...', 90);
       console.log(`[DocumentProcessor] Saving chunks to database`);
       await this.saveChunks(bookId, chunksWithEmbeddings);
       console.log(`[DocumentProcessor] Chunks saved successfully`);
 
       // Update book status to ready
+      onProgress?.('Finalizando processamento...', 95);
       console.log(`[DocumentProcessor] Updating status to ready`);
       await this.updateBookStatus(bookId, 'ready');
 
@@ -118,30 +129,32 @@ export class DocumentProcessor {
       case 'doc':
       case 'docx':
         return await this.extractFromDOC(fileContent);
-      case 'epub':
-        return await this.extractFromEPUB(fileContent);
       default:
-        throw new Error(`Unsupported file type: ${fileType}`);
+        throw new Error(`Unsupported file type: ${fileType}. Only PDF, DOC, DOCX, and TXT are supported.`);
     }
   }
 
   private async extractFromPDF(fileContent: ArrayBuffer): Promise<string> {
-    // For now, we'll use a simple text extraction
-    // In production, you'd want to use a proper PDF parser like pdf-parse
-    const text = new TextDecoder('utf-8').decode(fileContent);
-    
-    // Basic PDF text extraction (this is simplified)
-    // Remove PDF metadata and extract readable text
-    const cleanText = text
-      .replace(/[^\x20-\x7E\n\r]/g, ' ') // Remove non-printable characters
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .trim();
+    try {
+      // For now, we'll use a simple text extraction approach
+      // In a production environment, you'd want to use a proper PDF parser
+      const text = new TextDecoder('utf-8').decode(fileContent);
+      
+      // Basic PDF text extraction (this is simplified)
+      // Remove PDF metadata and extract readable text
+      const cleanText = text
+        .replace(/[^\x20-\x7E\n\r]/g, ' ') // Remove non-printable characters
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
 
-    if (cleanText.length < 100) {
-      throw new Error('PDF appears to be empty or corrupted');
+      if (cleanText.length < 50) {
+        throw new Error('PDF appears to be empty, corrupted, or contains only images. Please use a PDF with selectable text.');
+      }
+
+      return cleanText;
+    } catch (error: any) {
+      throw new Error(`Failed to extract text from PDF: ${error.message}`);
     }
-
-    return cleanText;
   }
 
   private async extractFromTXT(fileContent: ArrayBuffer): Promise<string> {
@@ -150,16 +163,28 @@ export class DocumentProcessor {
   }
 
   private async extractFromDOC(fileContent: ArrayBuffer): Promise<string> {
-    // For DOC/DOCX files, we'll need a proper parser
-    // For now, return a placeholder
-    throw new Error('DOC/DOCX processing not yet implemented. Please use PDF or TXT files.');
+    try {
+      // For DOC/DOCX files, we'll try to extract text using a simple approach
+      // This is a basic implementation - for production, you'd want a proper parser
+      const text = new TextDecoder('utf-8').decode(fileContent);
+      
+      // Basic text extraction for DOC/DOCX (this is simplified)
+      const cleanText = text
+        .replace(/[^\x20-\x7E\n\r]/g, ' ') // Remove non-printable characters
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+
+      if (cleanText.length < 50) {
+        throw new Error('DOC/DOCX file appears to be empty or corrupted. Please use a file with readable text content.');
+      }
+
+      return cleanText;
+    } catch (error: any) {
+      throw new Error(`Failed to extract text from DOC/DOCX: ${error.message}. Please try converting to TXT format.`);
+    }
   }
 
-  private async extractFromEPUB(fileContent: ArrayBuffer): Promise<string> {
-    // For EPUB files, we'll need a proper parser
-    // For now, return a placeholder
-    throw new Error('EPUB processing not yet implemented. Please use PDF or TXT files.');
-  }
+
 
   private splitIntoChunks(text: string): DocumentChunk[] {
     const chunks: DocumentChunk[] = [];
@@ -196,7 +221,7 @@ export class DocumentProcessor {
     return chunks;
   }
 
-  private async generateEmbeddings(chunks: DocumentChunk[], userId: string): Promise<DocumentChunk[]> {
+  private async generateEmbeddings(chunks: DocumentChunk[], userId: string, onProgress?: (step: string, progress: number) => void): Promise<DocumentChunk[]> {
     // Get user's OpenAI API key from settings
     const { data: userSettings, error } = await supabase
       .from('user_settings')
@@ -211,13 +236,18 @@ export class DocumentProcessor {
 
     const chunksWithEmbeddings: DocumentChunk[] = [];
 
-    for (const chunk of chunks) {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
       try {
         const embedding = await this.generateEmbedding(chunk.content, userSettings.openai_api_key);
         chunksWithEmbeddings.push({
           ...chunk,
           embedding
         });
+        
+        // Update progress for embeddings generation
+        const progress = 50 + ((i + 1) / chunks.length) * 35; // 50-85% range
+        onProgress?.(`Gerando embedding ${i + 1}/${chunks.length}...`, progress);
       } catch (error) {
         console.error('Error generating embedding for chunk:', error);
         // Continue without embedding

@@ -59,12 +59,20 @@ const LLM_PROVIDERS = {
   }
 };
 
-export const LLMSettings = () => {
+interface LLMSettingsProps {
+  onClose?: () => void;
+}
+
+export const LLMSettings = ({ onClose }: LLMSettingsProps = {}) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // Use external control if onClose is provided, otherwise use internal state
+  const open = onClose ? true : internalOpen;
+  const setOpen = onClose ? onClose : setInternalOpen;
   
   const [settings, setSettings] = useState<UserSettings>({
     llm_provider: 'openai',
@@ -160,12 +168,14 @@ export const LLMSettings = () => {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Settings className="h-4 w-4 mr-2" />
-          Configurações LLM
-        </Button>
-      </DialogTrigger>
+      {!onClose && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Settings className="h-4 w-4 mr-2" />
+            Configurações LLM
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

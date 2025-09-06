@@ -419,10 +419,26 @@ ${generatedScript.thumbnailPromptTranslated || generatedScript.thumbnailPrompt}`
                       <SelectValue placeholder="Selecione o estilo" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="formal">Formal</SelectItem>
+                      <SelectItem value="autoritaria-direta">Autoritária / Direta</SelectItem>
+                      <SelectItem value="cientifica">Científica</SelectItem>
+                      <SelectItem value="conversacional">Conversacional</SelectItem>
                       <SelectItem value="descontraida">Descontraída</SelectItem>
-                      <SelectItem value="narrativa">Narrativa</SelectItem>
+                      <SelectItem value="didatica-educacional">Didática / Educacional</SelectItem>
+                      <SelectItem value="emocional">Emocional</SelectItem>
+                      <SelectItem value="epica-grandiosa">Épica / Grandiosa</SelectItem>
+                      <SelectItem value="espiritual">Espiritual</SelectItem>
+                      <SelectItem value="formal">Formal</SelectItem>
+                      <SelectItem value="humoristica">Humorística</SelectItem>
                       <SelectItem value="inspiracional">Inspiracional</SelectItem>
+                      <SelectItem value="ironica-sarcastica">Irônica / Sarcástica</SelectItem>
+                      <SelectItem value="jornalistica-informativa">Jornalística / Informativa</SelectItem>
+                      <SelectItem value="minimalista">Minimalista</SelectItem>
+                      <SelectItem value="narrativa">Narrativa</SelectItem>
+                      <SelectItem value="poetica">Poética</SelectItem>
+                      <SelectItem value="polemica-provocativa">Polêmica / Provocativa</SelectItem>
+                      <SelectItem value="reflexiva-filosofica">Reflexiva / Filosófica</SelectItem>
+                      <SelectItem value="sedutora-picante">Sedutora / Picante</SelectItem>
+                      <SelectItem value="tecnica-profissional">Técnica / Profissional</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -444,10 +460,25 @@ ${generatedScript.thumbnailPromptTranslated || generatedScript.thumbnailPrompt}`
                       <SelectValue placeholder="Selecione o ambiente" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="aventura-epico">Aventura / Épico</SelectItem>
                       <SelectItem value="calmo">Calmo</SelectItem>
-                      <SelectItem value="suspense">Suspense</SelectItem>
-                      <SelectItem value="motivacional">Motivacional</SelectItem>
+                      <SelectItem value="comedia-humoristico">Comédia / Humorístico</SelectItem>
+                      <SelectItem value="dramatico">Dramático</SelectItem>
                       <SelectItem value="educativo">Educativo</SelectItem>
+                      <SelectItem value="espiritual-reflexivo">Espiritual / Reflexivo</SelectItem>
+                      <SelectItem value="fitness-energia">Fitness / Energia</SelectItem>
+                      <SelectItem value="infantil-divertido">Infantil / Divertido</SelectItem>
+                      <SelectItem value="inspiracional-superacao">Inspiracional / Superação</SelectItem>
+                      <SelectItem value="luxo-exclusivo">Luxo / Exclusivo</SelectItem>
+                      <SelectItem value="misterioso-investigativo">Misterioso / Investigativo</SelectItem>
+                      <SelectItem value="motivacional">Motivacional</SelectItem>
+                      <SelectItem value="noticioso-jornalistico">Noticioso / Jornalístico</SelectItem>
+                      <SelectItem value="picante-sensual">Picante / Sensual</SelectItem>
+                      <SelectItem value="polemico-provocativo">Polêmico / Provocativo</SelectItem>
+                      <SelectItem value="romantico">Romântico</SelectItem>
+                      <SelectItem value="saude-bem-estar">Saúde & Bem-estar</SelectItem>
+                      <SelectItem value="suspense">Suspense</SelectItem>
+                      <SelectItem value="tecnologico-futurista">Tecnológico / Futurista</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -12,9 +12,6 @@ export default defineConfig(({ mode }) => ({
       port: 8081,
       host: "localhost",
     },
-    ws: {
-      port: 8081,
-    },
   },
   plugins: [
     react(),

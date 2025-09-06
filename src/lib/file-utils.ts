@@ -31,7 +31,7 @@ export function generateUniqueFilename(originalFilename: string): string {
  * @returns True if file type is allowed
  */
 export function isAllowedFileType(filename: string): boolean {
-  const allowedExtensions = ['.pdf', '.txt', '.doc', '.docx', '.epub'];
+  const allowedExtensions = ['.pdf', '.txt', '.doc', '.docx'];
   const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
   return allowedExtensions.includes(extension);
 }

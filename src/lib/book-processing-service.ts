@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 export class BookProcessingService {
   private processingQueue: Set<string> = new Set();
 
-  async processBook(bookId: string): Promise<void> {
+  async processBook(bookId: string, onProgress?: (step: string, progress: number) => void): Promise<void> {
     // Prevent duplicate processing
     if (this.processingQueue.has(bookId)) {
       console.log(`Book ${bookId} is already being processed`);
@@ -15,16 +15,20 @@ export class BookProcessingService {
 
     try {
       console.log(`Starting processing for book ${bookId}`);
+      onProgress?.('Iniciando processamento...', 0);
       
-      const result = await documentProcessor.processBook(bookId);
+      const result = await documentProcessor.processBook(bookId, onProgress);
       
       if (result.success) {
         console.log(`Successfully processed book ${bookId} with ${result.chunks} chunks`);
+        onProgress?.('Processamento concluído!', 100);
       } else {
         console.error(`Failed to process book ${bookId}: ${result.error}`);
+        onProgress?.('Erro no processamento', 0);
       }
     } catch (error) {
       console.error(`Error processing book ${bookId}:`, error);
+      onProgress?.('Erro no processamento', 0);
     } finally {
       this.processingQueue.delete(bookId);
     }

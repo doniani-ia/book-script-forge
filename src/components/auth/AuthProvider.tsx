@@ -6,6 +6,7 @@ interface Profile {
   id: string;
   user_id: string;
   display_name: string | null;
+  email: string | null;
   role: 'admin' | 'user';
 }
 
@@ -34,53 +35,86 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+  const fetchProfile = async (userId: string, userEmail?: string) => {
+    console.log('👤 [AuthProvider] fetchProfile called for user:', userId);
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
 
-    if (error) {
-      console.error('Error fetching profile:', error);
+      if (error) {
+        console.error('❌ [AuthProvider] Error fetching profile:', error);
+        return null;
+      }
+
+      // Add email from user object to profile
+      const profileData = {
+        ...data,
+        email: userEmail || null
+      } as Profile;
+
+      console.log('✅ [AuthProvider] Profile fetched successfully:', profileData.display_name);
+      return profileData;
+    } catch (error) {
+      console.error('❌ [AuthProvider] Unexpected error in fetchProfile:', error);
       return null;
     }
-
-    return data as Profile;
   };
 
   useEffect(() => {
     const getSession = async () => {
+      console.log('🔍 [AuthProvider] Starting getSession...');
       try {
-        // Adiciona timeout para evitar travamento
+        // Timeout reduzido para 5 segundos
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 10000)
+          setTimeout(() => reject(new Error('Session timeout')), 5000)
         );
         
+        console.log('🔍 [AuthProvider] Calling supabase.auth.getSession()...');
         const sessionPromise = supabase.auth.getSession();
         
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        console.log('🔍 [AuthProvider] Session result:', session ? 'Found' : 'Not found', session?.user?.id);
         
         if (session?.user) {
+          console.log('🔍 [AuthProvider] Setting user and session...');
           setUser(session.user);
           setSession(session);
           try {
-            const profileData = await fetchProfile(session.user.id);
+            console.log('🔍 [AuthProvider] Fetching profile for user:', session.user.id);
+            const profileData = await fetchProfile(session.user.id, session.user.email);
+            console.log('🔍 [AuthProvider] Profile fetched:', profileData ? 'Success' : 'Failed');
             setProfile(profileData);
           } catch (profileError) {
-            console.warn('Error fetching profile, continuing without profile:', profileError);
+            console.warn('⚠️ [AuthProvider] Error fetching profile, continuing without profile:', profileError);
             setProfile(null);
           }
+        } else {
+          console.log('🔍 [AuthProvider] No session found, clearing state...');
+          // Sem sessão ativa, continua normalmente
+          setUser(null);
+          setSession(null);
+          setProfile(null);
         }
       } catch (error) {
-        console.error('Error getting session:', error);
-        // Continua sem usuário em caso de erro
+        console.error('❌ [AuthProvider] Error in getSession:', error);
+        // Log apenas em desenvolvimento, não em produção
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Session check failed, continuing without authentication:', error);
+        }
+        // Continua sem usuário em caso de erro (modo offline ou problemas de conectividade)
         setUser(null);
         setSession(null);
         setProfile(null);
       } finally {
+        console.log('🔍 [AuthProvider] getSession completed, setting loading to false and initialLoadComplete to true');
         setLoading(false);
+        setInitialLoadComplete(true);
       }
     };
 
@@ -88,30 +122,53 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔄 [AuthProvider] onAuthStateChange triggered:', event, session?.user?.id);
+        
+        // Evitar processamento desnecessário para eventos irrelevantes
+        if (event === 'INITIAL_SESSION') {
+          console.log('🔄 [AuthProvider] Skipping INITIAL_SESSION event (handled by getSession)');
+          return;
+        }
+        
         try {
           if (session?.user) {
+            console.log('🔄 [AuthProvider] Setting user and session from auth state change...');
             setUser(session.user);
             setSession(session);
             try {
-              const profileData = await fetchProfile(session.user.id);
+              console.log('🔄 [AuthProvider] Fetching profile from auth state change...');
+              const profileData = await fetchProfile(session.user.id, session.user.email);
+              console.log('🔄 [AuthProvider] Profile fetched from auth state change:', profileData ? 'Success' : 'Failed');
               setProfile(profileData);
             } catch (profileError) {
-              console.warn('Error fetching profile in auth state change:', profileError);
+              console.warn('⚠️ [AuthProvider] Error fetching profile in auth state change:', profileError);
               setProfile(null);
             }
           } else {
+            console.log('🔄 [AuthProvider] No session in auth state change, clearing state...');
             setUser(null);
             setSession(null);
             setProfile(null);
           }
         } catch (error) {
-          console.error('Error in auth state change:', error);
+          console.error('❌ [AuthProvider] Error in auth state change:', error);
+          // Log apenas em desenvolvimento
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Error in auth state change:', error);
+          }
           // Em caso de erro, limpa o estado
           setUser(null);
           setSession(null);
           setProfile(null);
         } finally {
-          setLoading(false);
+          // Só resetar loading se ainda não foi completado o carregamento inicial
+          if (!initialLoadComplete) {
+            console.log('🔄 [AuthProvider] onAuthStateChange completed, setting loading to false (initial load)');
+            setLoading(false);
+            setInitialLoadComplete(true);
+          } else {
+            console.log('🔄 [AuthProvider] onAuthStateChange completed, initial load already done, keeping loading state');
+          }
         }
       }
     );

@@ -24,12 +24,14 @@ const AppContent = () => {
   const [showFallback, setShowFallback] = useState(false);
   
   useEffect(() => {
+    console.log('🔄 [App] Loading state changed:', loading);
+    
     const timer = setTimeout(() => {
       if (loading) {
-        console.warn('Loading timeout reached, showing fallback');
+        console.warn('⚠️ [App] Loading timeout reached (10s), showing fallback');
         setShowFallback(true);
       }
-    }, 15000); // 15 segundos
+    }, 10000); // Reduzido para 10 segundos
 
     return () => clearTimeout(timer);
   }, [loading]);
